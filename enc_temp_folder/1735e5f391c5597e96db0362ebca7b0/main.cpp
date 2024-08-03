@@ -80,7 +80,6 @@ int main(int argc, char* argv[]) {
 			int mouseX = GetMouseX();
 			int mouseY = GetMouseY();
 			std::cout << "Clicked X: " << mouseX << " Y: " << mouseY << "\n";
-
 			Cell* foundCell = findCell(cellMap, mouseX, mouseY);
 			if (foundCell != nullptr) foundCell->toggle();
 		}
