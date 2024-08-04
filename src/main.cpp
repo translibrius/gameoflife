@@ -86,10 +86,10 @@ void makeMap(std::vector<Cell> &cellMap, Vector2 cellSize) {
 	// Create initial cell state map
 	short cellIndex = 0;
 	std::vector<Cell> newMap = {};
-	for (short i = HEADER_HEIGHT / cellSize.y; i < WINDOW_HEIGHT / cellSize.y; i++) {
+	for (short i = 0; i < WINDOW_HEIGHT / cellSize.y; i++) {
 		for (short j = 0; j < WINDOW_WIDTH / cellSize.x; j++) {
 			float x = (float)j * cellSize.x;
-			float y = (float)i * cellSize.y;
+			float y = HEADER_HEIGHT + (float)i * cellSize.y;
 			Vector2 position = { x, y };
 
 			bool enabled = false;
@@ -131,6 +131,8 @@ int main(int argc, char* argv[]) {
 		std::string gridText = "Grid: " + std::to_string(gridCount) + "x" + std::to_string(gridCount);
 		std::string speedText = "Speed: " + std::to_string(simsPerSec) + " sims/s";
 		std::string startStopText = gameState == pickingCells ? "Start" : "Stop";
+
+		Color btnStartColor = gameState == pickingCells ? GREEN : RED;
 
 		// Input
 		if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
@@ -258,7 +260,7 @@ int main(int argc, char* argv[]) {
 		DrawText(speedText.c_str(), 15, 55, 16, { 255, 255, 255, 255 });
 		
 		// Start / Stop button
-		DrawRectangle(btnStartPos.x, btnStartPos.y, btnStartSize.x, btnStartSize.y, { 255, 0, 0, 255 });
+		DrawRectangle(btnStartPos.x, btnStartPos.y, btnStartSize.x, btnStartSize.y, btnStartColor);
 		DrawText(startStopText.c_str(), WINDOW_WIDTH / 2 - 20, 15, 16, {255, 255, 255, 255});
 
 		EndDrawing();
