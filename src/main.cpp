@@ -4,10 +4,12 @@
 #include <iostream>
 #include <chrono>
 
-static const Color COLOR_CELL_BORDER = { 135, 60, 190, 180 };
-static const short CELL_BORDER_WIDTH = 1;
+static const Color COLOR_CELL_BORDER_DEAD = { 230, 41, 55, 90 };  // Red
+static const Color COLOR_CELL_BORDER_ALIVE = { 230, 41, 55, 255 }; // Gold
+static const short CELL_BORDER_WIDTH = 3;
+static const short CELL_PADDING = 1;
 static const Color COLOR_CELL_DEAD = {20, 20, 0, 255};
-static const Color COLOR_CELL_ALIVE = { MAGENTA };
+static const Color COLOR_CELL_ALIVE = { 100, 20, 0, 200 };
 static const Color COLOR_BACKGROUND = { 30, 30, 30, 255 };
 
 static const short WINDOW_WIDTH = 960;
@@ -32,9 +34,22 @@ struct Cell {
 	}
 
 	void draw() {
-		DrawRectangle(position.x, position.y, size.x, size.y, COLOR_CELL_BORDER);
-		if (!alive) DrawRectangle(position.x, position.y, size.x - CELL_BORDER_WIDTH, size.y - CELL_BORDER_WIDTH, COLOR_CELL_DEAD);
-		else		DrawRectangle(position.x, position.y, size.x - CELL_BORDER_WIDTH, size.y - CELL_BORDER_WIDTH, COLOR_CELL_ALIVE);
+		// Border
+		DrawRectangle(
+			position.x + CELL_PADDING,
+			position.y + CELL_PADDING,
+			size.x - CELL_PADDING,
+			size.y - CELL_PADDING,
+			alive ? COLOR_CELL_BORDER_ALIVE : COLOR_CELL_BORDER_DEAD
+		);
+		// Cell
+		DrawRectangle(
+			position.x + CELL_BORDER_WIDTH + CELL_PADDING,
+			position.y + CELL_BORDER_WIDTH + CELL_PADDING,
+			size.x - CELL_BORDER_WIDTH - CELL_PADDING - 3,
+			size.y - CELL_BORDER_WIDTH - CELL_PADDING - 3,
+			alive ? COLOR_CELL_ALIVE : COLOR_CELL_DEAD
+		);
 	}
 };
 
@@ -67,7 +82,7 @@ bool findStartBtn(Vector2 posBtn, Vector2 posClick, Vector2 btnSize) {
 	return false;
 }
 
-void zoomMap(std::vector<Cell> &cellMap, Vector2 cellSize) {
+void makeMap(std::vector<Cell> &cellMap, Vector2 cellSize) {
 	// Create initial cell state map
 	short cellIndex = 0;
 	std::vector<Cell> newMap = {};
@@ -87,7 +102,7 @@ void zoomMap(std::vector<Cell> &cellMap, Vector2 cellSize) {
 
 int main(int argc, char* argv[]) {
 	short gridCount = 30;
-	const float simsPerSec = 2.5f;
+	float simsPerSec = 2.5f;
 
 	Vector2 cellSize = { WINDOW_WIDTH / gridCount, WINDOW_HEIGHT / gridCount};
 	const Vector2 btnStartPos { WINDOW_WIDTH / 2 - 50, 10.0f };
@@ -101,20 +116,11 @@ int main(int argc, char* argv[]) {
 	std::vector<short> defaultAlivePattern = {};
 	int simulationCounter = 0;
 	double timeSinceLastSim = 1;
+	int lastToggledID = -1;
 
 	// Create initial cell state map
 	short cellIndex = 0;
-	for (short i = HEADER_HEIGHT / cellSize.y; i < WINDOW_HEIGHT / cellSize.y; i++) {
-		for (short j = 0; j < WINDOW_WIDTH / cellSize.x; j++) {
-			float x = (float)j * cellSize.x;
-			float y = (float)i * cellSize.y;
-			Vector2 position = { x, y };
-
-			bool enabled = std::find(defaultAlivePattern.begin(), defaultAlivePattern.end(), cellIndex) != defaultAlivePattern.end();
-			cellMap.push_back(Cell(cellIndex, enabled, position, cellSize));
-			cellIndex++;
-		}
-	}
+	makeMap(cellMap, cellSize);
 
 	while (!WindowShouldClose()) {
 		if (!IsWindowReady()) continue;
@@ -122,22 +128,36 @@ int main(int argc, char* argv[]) {
 		int fps = GetFPS();
 		std::string fpsText = "FPS: " + std::to_string(fps);
 		std::string simulationText = "Simulation: " + std::to_string(simulationCounter);
+		std::string gridText = "Grid: " + std::to_string(gridCount) + "x" + std::to_string(gridCount);
+		std::string speedText = "Speed: " + std::to_string(simsPerSec) + " sims/s";
 		std::string startStopText = gameState == pickingCells ? "Start" : "Stop";
 
 		// Input
-		if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+		if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
 			int mouseX = GetMouseX();
 			int mouseY = GetMouseY();
 			std::cout << "Clicked X: " << mouseX << " Y: " << mouseY << "\n";
 
 			if (mouseY > HEADER_HEIGHT) {
-				if (gameState == pickingCells) {
-					Cell* foundCell = findCell(cellMap, mouseX, mouseY);
-					if (foundCell != nullptr) foundCell->toggle();
+				Cell* foundCell = findCell(cellMap, mouseX, mouseY);
+				if (foundCell != nullptr && lastToggledID != foundCell->id) {
+					foundCell->toggle();
+					lastToggledID = foundCell->id;
+				}
+
+				// User wants to draw new cells, pause sim
+				if (gameState != pickingCells) {
+					gameState = pickingCells;
 				}
 			}
-			else {
-				bool wasStartBtnPressed = findStartBtn(btnStartPos, {(float) mouseX, (float) mouseY}, btnStartSize);
+		}
+
+		if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+			int mouseX = GetMouseX();
+			int mouseY = GetMouseY();
+
+			if (mouseY <= HEADER_HEIGHT) {
+				bool wasStartBtnPressed = findStartBtn(btnStartPos, { (float)mouseX, (float)mouseY }, btnStartSize);
 				if (wasStartBtnPressed) {
 					if (gameState == pickingCells) gameState = simulating;
 					else if (gameState == simulating) gameState = pickingCells;
@@ -148,12 +168,20 @@ int main(int argc, char* argv[]) {
 		if ((int) GetMouseWheelMove() >= 1) {
 			gridCount--;
 			cellSize = { (float) WINDOW_WIDTH / gridCount, (float) WINDOW_HEIGHT / gridCount };
-			zoomMap(cellMap, cellSize);
+			makeMap(cellMap, cellSize);
 		}
 		else if ((int) GetMouseWheelMove() <= -1) {
 			gridCount++;
 			cellSize = { (float)WINDOW_WIDTH / gridCount, (float)WINDOW_HEIGHT / gridCount };
-			zoomMap(cellMap, cellSize);
+			makeMap(cellMap, cellSize);
+		}
+
+		if (IsKeyDown(KEY_LEFT)) {
+			simsPerSec -= 0.05f;
+			if (simsPerSec < 0) simsPerSec = 0;
+		}
+		else if (IsKeyDown(KEY_RIGHT)){
+			simsPerSec += 0.05f;
 		}
 		
 		if (gameState == simulating) {
@@ -214,7 +242,7 @@ int main(int argc, char* argv[]) {
 			timeSinceLastSim = 1;
 		}
 
-		// Draw
+		// Draw -----------------------------------------------------------------------------------------
 		BeginDrawing();
 		ClearBackground(COLOR_BACKGROUND);
 
@@ -223,9 +251,11 @@ int main(int argc, char* argv[]) {
 			cell.draw();
 		}
 
-		// FPS indicator
+		// Top left texts
 		DrawText(fpsText.c_str(), 15, 10, 16, { 255, 255, 255, 255 });
 		DrawText(simulationText.c_str(), 15, 25, 16, { 255, 255, 255, 255 });
+		DrawText(gridText.c_str(), 15, 40, 16, { 255, 255, 255, 255 });
+		DrawText(speedText.c_str(), 15, 55, 16, { 255, 255, 255, 255 });
 		
 		// Start / Stop button
 		DrawRectangle(btnStartPos.x, btnStartPos.y, btnStartSize.x, btnStartSize.y, { 255, 0, 0, 255 });
