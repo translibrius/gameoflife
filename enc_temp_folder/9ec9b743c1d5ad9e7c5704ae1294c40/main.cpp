@@ -62,8 +62,8 @@ struct Pattern {
 };
 
 std::vector<Pattern> patterns = {
-    {50, {}},                        // Default empty [50x50]
-    {30, {186, 216, 246, 245, 244}}, // Glider pattern [30x30]
+    {50, {}},                        // Default -- Empty
+    {30, {186, 216, 246, 245, 244}}, // Glider pattern for 30x30 grid
     {20, {43, 44, 45, 65, 85}},      // Example pattern for 20x20 grid
 };
 
