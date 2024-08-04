@@ -4,15 +4,15 @@
 #include <iostream>
 #include <chrono>
 
+static const Color COLOR_CELL_BORDER = { 135, 60, 190, 180 };
+static const short CELL_BORDER_WIDTH = 1;
 static const Color COLOR_CELL_DEAD = {20, 20, 0, 255};
-static const Color COLOR_CELL_ALIVE = { 0, 200, 40, 255 };
+static const Color COLOR_CELL_ALIVE = { MAGENTA };
 static const Color COLOR_BACKGROUND = { 30, 30, 30, 255 };
 
-const std::vector<short> CELL_PATTERN_ROMBUS = { 840, 791, 793, 745, 743,
-													 694, 646, 598, 550, 502,
-													 455, 407, 360, 409, 457,
-													 506, 554, 602, 650, 698,
-													 552, 600, 648 };
+static const short WINDOW_WIDTH = 960;
+static const short WINDOW_HEIGHT = 960;
+static const short HEADER_HEIGHT = 80;
 
 struct Cell {
 	Cell(int id, bool alive, Vector2 pos, Vector2 size) {
@@ -32,8 +32,9 @@ struct Cell {
 	}
 
 	void draw() {
-		if (!alive) DrawRectangle(position.x, position.y, size.x, size.y, COLOR_CELL_DEAD);
-		else		DrawRectangle(position.x, position.y, size.x, size.y, COLOR_CELL_ALIVE);
+		DrawRectangle(position.x, position.y, size.x, size.y, COLOR_CELL_BORDER);
+		if (!alive) DrawRectangle(position.x, position.y, size.x - CELL_BORDER_WIDTH, size.y - CELL_BORDER_WIDTH, COLOR_CELL_DEAD);
+		else		DrawRectangle(position.x, position.y, size.x - CELL_BORDER_WIDTH, size.y - CELL_BORDER_WIDTH, COLOR_CELL_ALIVE);
 	}
 };
 
@@ -66,15 +67,29 @@ bool findStartBtn(Vector2 posBtn, Vector2 posClick, Vector2 btnSize) {
 	return false;
 }
 
+void zoomMap(std::vector<Cell> &cellMap, Vector2 cellSize) {
+	// Create initial cell state map
+	short cellIndex = 0;
+	std::vector<Cell> newMap = {};
+	for (short i = HEADER_HEIGHT / cellSize.y; i < WINDOW_HEIGHT / cellSize.y; i++) {
+		for (short j = 0; j < WINDOW_WIDTH / cellSize.x; j++) {
+			float x = (float)j * cellSize.x;
+			float y = (float)i * cellSize.y;
+			Vector2 position = { x, y };
+
+			bool enabled = false;
+			newMap.push_back(Cell(cellIndex, enabled, position, cellSize));
+			cellIndex++;
+		}
+	}
+	cellMap = newMap;
+}
+
 int main(int argc, char* argv[]) {
-	const short WINDOW_WIDTH = 960;
-	const short WINDOW_HEIGHT = 960;
-	const short HEADER_HEIGHT = 80;
-	const short gridCount = 65;
+	short gridCount = 30;
 	const float simsPerSec = 2.5f;
 
-	const Vector2 cellSize = { WINDOW_WIDTH / gridCount, WINDOW_HEIGHT / gridCount};
-
+	Vector2 cellSize = { WINDOW_WIDTH / gridCount, WINDOW_HEIGHT / gridCount};
 	const Vector2 btnStartPos { WINDOW_WIDTH / 2 - 50, 10.0f };
 	const Vector2 btnStartSize{ 100, 25 };
 
@@ -83,7 +98,7 @@ int main(int argc, char* argv[]) {
 
 	GameState gameState = pickingCells;
 	std::vector<Cell> cellMap;
-	std::vector<short> defaultAlivePattern = CELL_PATTERN_ROMBUS;
+	std::vector<short> defaultAlivePattern = {};
 	int simulationCounter = 0;
 	double timeSinceLastSim = 1;
 
@@ -91,8 +106,8 @@ int main(int argc, char* argv[]) {
 	short cellIndex = 0;
 	for (short i = HEADER_HEIGHT / cellSize.y; i < WINDOW_HEIGHT / cellSize.y; i++) {
 		for (short j = 0; j < WINDOW_WIDTH / cellSize.x; j++) {
-			float x = (float) j * cellSize.x;
-			float y = (float) i * cellSize.y;
+			float x = (float)j * cellSize.x;
+			float y = (float)i * cellSize.y;
 			Vector2 position = { x, y };
 
 			bool enabled = std::find(defaultAlivePattern.begin(), defaultAlivePattern.end(), cellIndex) != defaultAlivePattern.end();
@@ -106,6 +121,7 @@ int main(int argc, char* argv[]) {
 
 		int fps = GetFPS();
 		std::string fpsText = "FPS: " + std::to_string(fps);
+		std::string simulationText = "Simulation: " + std::to_string(simulationCounter);
 		std::string startStopText = gameState == pickingCells ? "Start" : "Stop";
 
 		// Input
@@ -127,6 +143,17 @@ int main(int argc, char* argv[]) {
 					else if (gameState == simulating) gameState = pickingCells;
 				}
 			}
+		}
+
+		if ((int) GetMouseWheelMove() >= 1) {
+			gridCount--;
+			cellSize = { (float) WINDOW_WIDTH / gridCount, (float) WINDOW_HEIGHT / gridCount };
+			zoomMap(cellMap, cellSize);
+		}
+		else if ((int) GetMouseWheelMove() <= -1) {
+			gridCount++;
+			cellSize = { (float)WINDOW_WIDTH / gridCount, (float)WINDOW_HEIGHT / gridCount };
+			zoomMap(cellMap, cellSize);
 		}
 		
 		if (gameState == simulating) {
@@ -197,7 +224,8 @@ int main(int argc, char* argv[]) {
 		}
 
 		// FPS indicator
-		DrawText(fpsText.c_str(), 15, 10, 24, { 255, 0, 0, 255 });
+		DrawText(fpsText.c_str(), 15, 10, 16, { 255, 255, 255, 255 });
+		DrawText(simulationText.c_str(), 15, 25, 16, { 255, 255, 255, 255 });
 		
 		// Start / Stop button
 		DrawRectangle(btnStartPos.x, btnStartPos.y, btnStartSize.x, btnStartSize.y, { 255, 0, 0, 255 });
