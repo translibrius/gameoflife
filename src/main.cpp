@@ -6,18 +6,17 @@
 
 static const Color COLOR_CELL_DEAD = {20, 20, 0, 255};
 static const Color COLOR_CELL_ALIVE = { 0, 200, 40, 255 };
-
 static const Color COLOR_BACKGROUND = { 30, 30, 30, 255 };
-const short CELL_SIZE = 20;
+
+const std::vector<short> CELL_PATTERN_ROMBUS = { 840, 791, 793, 745, 743,
+													 694, 646, 598, 550, 502,
+													 455, 407, 360, 409, 457,
+													 506, 554, 602, 650, 698,
+													 552, 600, 648 };
 
 struct Cell {
-	Cell(int id, bool alive, Vector2 pos) {
-		this->alive = alive;
-		this->position = pos;
-		this->id = id;
-	};
-
-	Cell(bool alive, Vector2 pos, short size) {
+	Cell(int id, bool alive, Vector2 pos, Vector2 size) {
+		this->id = id,
 		this->alive = alive;
 		this->position = pos;
 		this->size = size;
@@ -26,15 +25,15 @@ struct Cell {
 	int id;
 	bool alive;
 	Vector2 position;
-	short size = CELL_SIZE;
+	Vector2 size;
 
 	void toggle() {
 		this->alive = !alive;
 	}
 
 	void draw() {
-		if (!alive) DrawRectangle(position.x, position.y, size, size, COLOR_CELL_DEAD);
-		else		DrawRectangle(position.x, position.y, size, size, COLOR_CELL_ALIVE);
+		if (!alive) DrawRectangle(position.x, position.y, size.x, size.y, COLOR_CELL_DEAD);
+		else		DrawRectangle(position.x, position.y, size.x, size.y, COLOR_CELL_ALIVE);
 	}
 };
 
@@ -45,8 +44,8 @@ enum GameState {
 
 Cell* findCell(std::vector<Cell> &cellList, int mouseX, int mouseY) {
 	for (Cell& cell : cellList) {
-		if (mouseX >= cell.position.x && mouseX <= cell.position.x + cell.size) {
-			if (mouseY >= cell.position.y && mouseY <= cell.position.y + cell.size) {
+		if (mouseX >= cell.position.x && mouseX <= cell.position.x + cell.size.x) {
+			if (mouseY >= cell.position.y && mouseY <= cell.position.y + cell.size.y) {
 				// Found cell
 				std::cout << "Cell " << cell.id << " found at " << cell.position.x << ", " << cell.position.y << "\n";
 				return &cell;
@@ -69,18 +68,15 @@ bool findStartBtn(Vector2 posBtn, Vector2 posClick, Vector2 btnSize) {
 
 int main(int argc, char* argv[]) {
 	const short WINDOW_WIDTH = 960;
-	const short WINDOW_HEIGHT = 540;
-	const short HEADER_HEIGHT = 40;
-	const float SIMS_PER_SECOND = 2.5f;
+	const short WINDOW_HEIGHT = 960;
+	const short HEADER_HEIGHT = 80;
+	const short gridCount = 65;
+	const float simsPerSec = 2.5f;
+
+	const Vector2 cellSize = { WINDOW_WIDTH / gridCount, WINDOW_HEIGHT / gridCount};
 
 	const Vector2 btnStartPos { WINDOW_WIDTH / 2 - 50, 10.0f };
 	const Vector2 btnStartSize{ 100, 25 };
-
-	// 600 is center cell
-	const std::vector<short> CELL_PATTERN_ROMBUS = { 840, 791, 793, 745, 743, 
-													 694, 646, 598, 550, 502,
-													 455, 407, 360, 409, 457,
-												     506, 554, 602, 650, 698};
 
 	InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Game of Life");
 	SetTargetFPS(180);
@@ -93,14 +89,14 @@ int main(int argc, char* argv[]) {
 
 	// Create initial cell state map
 	short cellIndex = 0;
-	for (short i = HEADER_HEIGHT / CELL_SIZE; i < WINDOW_HEIGHT / CELL_SIZE; i++) {
-		for (short j = 0; j < WINDOW_WIDTH / CELL_SIZE; j++) {
-			float x = (float) j * CELL_SIZE;
-			float y = (float) i * CELL_SIZE;
+	for (short i = HEADER_HEIGHT / cellSize.y; i < WINDOW_HEIGHT / cellSize.y; i++) {
+		for (short j = 0; j < WINDOW_WIDTH / cellSize.x; j++) {
+			float x = (float) j * cellSize.x;
+			float y = (float) i * cellSize.y;
 			Vector2 position = { x, y };
 
 			bool enabled = std::find(defaultAlivePattern.begin(), defaultAlivePattern.end(), cellIndex) != defaultAlivePattern.end();
-			cellMap.push_back(Cell(cellIndex, enabled, position));
+			cellMap.push_back(Cell(cellIndex, enabled, position, cellSize));
 			cellIndex++;
 		}
 	}
@@ -134,10 +130,10 @@ int main(int argc, char* argv[]) {
 		}
 		
 		if (gameState == simulating) {
-			if (timeSinceLastSim >= 1 / SIMS_PER_SECOND) {
+			if (timeSinceLastSim >= 1 / simsPerSec) {
 				const short min = 0;
 				const short max = cellMap.size();
-				const short width = WINDOW_WIDTH / CELL_SIZE;  // Number of columns in the grid
+				const short width = WINDOW_WIDTH / cellSize.x;  // Number of columns in the grid
 
 				std::vector<Cell> nextGen = cellMap;
 				for (int i = min; i < max; i++) {
@@ -151,12 +147,12 @@ int main(int argc, char* argv[]) {
 					short left = (col > 0) ? i - 1 : -1;
 					short right = (col < width - 1) ? i + 1 : -1;
 					short up = (row > 0) ? i - width : -1;
-					short down = (row < (WINDOW_HEIGHT / CELL_SIZE) - 1) ? i + width : -1;
+					short down = (row < (WINDOW_HEIGHT / cellSize.y) - 1) ? i + width : -1;
 
 					short topLeft = (row > 0 && col > 0) ? i - width - 1 : -1;
 					short topRight = (row > 0 && col < width - 1) ? i - width + 1 : -1;
-					short bottomLeft = (row < (WINDOW_HEIGHT / CELL_SIZE) - 1 && col > 0) ? i + width - 1 : -1;
-					short bottomRight = (row < (WINDOW_HEIGHT / CELL_SIZE) - 1 && col < width - 1) ? i + width + 1 : -1;
+					short bottomLeft = (row < (WINDOW_HEIGHT / cellSize.y) - 1 && col > 0) ? i + width - 1 : -1;
+					short bottomRight = (row < (WINDOW_HEIGHT / cellSize.y) - 1 && col < width - 1) ? i + width + 1 : -1;
 
 					if (left > min && left < max && cellMap.at(left).alive) neighbors++;
 					if (right > min && right < max && cellMap.at(right).alive) neighbors++;
