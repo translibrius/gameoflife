@@ -69,8 +69,7 @@ This project is an implementation of Conway's Game of Life using the Raylib libr
 ### Functions
 
 - **findCell()**: Finds a cell based on mouse coordinates.
-- **printAliveIDS()**: Prints the IDs of alive cells.
-- **findStartBtn()**: Checks if the start button was clicked.
+- **printAliveIDS()**: Prints the IDs of alive cells. Useful for making new patters.
 - **makeMap()**: Creates the initial cell map based on the selected pattern.
 
 ### Main Loop

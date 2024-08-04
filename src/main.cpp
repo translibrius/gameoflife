@@ -99,15 +99,6 @@ void printAliveIDS(std::vector<Cell> cellMap) {
     std::cout << output << "\n";
 }
 
-bool findStartBtn(Vector2 posBtn, Vector2 posClick, Vector2 btnSize) {
-    if (posClick.x >= posBtn.x && posClick.x <= posBtn.x + btnSize.x) {
-        if (posClick.y >= posBtn.y && posClick.y <= posBtn.y + btnSize.y) {
-            return true;
-        }
-    }
-    return false;
-}
-
 // Returns alive cells
 int makeMap(std::vector<Cell>& cellMap, Vector2 cellSize, int gridCount, std::vector<short> pattern) {
     // Create initial cell state map
