@@ -57,14 +57,18 @@ struct Cell {
 };
 
 struct Pattern {
+    std::string name;
     int gridCount;
     std::vector<short> aliveCells;
 };
 
 std::vector<Pattern> patterns = {
-    {50, {}},                        // Default empty [50x50]
-    {30, {186, 216, 246, 245, 244}}, // Glider pattern [30x30]
-    {20, {43, 44, 45, 65, 85}},      // Example pattern for 20x20 grid
+    {"Empty", 15, {}},
+    {"Gliders", 50, { 53, 101, 103, 152, 153, 256, 304, 306, 355, 356, 1017, 1018, 1067, 1068 } },
+    {"GliderGun", 50, { 829, 877, 879, 917, 918, 925, 926, 939, 940, 966, 970, 975, 976, 989, 990,
+    1005, 1006, 1015, 1021, 1025, 1026, 1055, 1056, 1065, 1069, 1071, 1072, 1077, 1079, 1115, 1121,
+    1129, 1166, 1170, 1217, 1218, }},
+    {"BlinkerPuffer1", 71, { 2097, 2098, 2099, 2103, 2104, 2105, 2136, 2154, 2168, 2171, 2173, 2176, 2206, 2207, 2208, 2212, 2213, 2214, 2218, 2219, 2220, 2224, 2225, 2226, 2234, 2239, 2247, 2252, 2277, 2279, 2280, 2283, 2286, 2288, 2291, 2294, 2295, 2297, 2304, 2305, 2306, 2310, 2318, 2322, 2323, 2324, 2349, 2350, 2351, 2354, 2362, 2365, 2366, 2367, 2375, 2377, 2378, 2381, 2389, 2392, 2393, 2395, 2420, 2421, 2422, 2425, 2433, 2436, 2437, 2438, 2447, 2448, 2449, 2452, 2460, 2463, 2464, 2465, 2491, 2492, 2493, 2496, 2504, 2507, 2508, 2509, 2518, 2519, 2520, 2523, 2531, 2534, 2535, 2536, 2562, 2563, 2567, 2570, 2572, 2575, 2579, 2580, 2589, 2590, 2594, 2597, 2599, 2602, 2606, 2607, 2639, 2640, 2644, 2645, 2666, 2667, 2671, 2672, 2852, 2853, 2854, 2856, 2857, 2858, 2950, 2951, 2952, 2954, 2955, 2956, }},
 };
 
 enum GameState {
@@ -86,6 +90,15 @@ Cell* findCell(std::vector<Cell>& cellList, int mouseX, int mouseY) {
     return nullptr;
 }
 
+void printAliveIDS(std::vector<Cell> cellMap) {
+    std::string output = "Alive: { ";
+    for (Cell cell : cellMap) {
+        if (cell.alive) output += std::to_string(cell.id) + ", ";
+    }
+    output += "}";
+    std::cout << output << "\n";
+}
+
 bool findStartBtn(Vector2 posBtn, Vector2 posClick, Vector2 btnSize) {
     if (posClick.x >= posBtn.x && posClick.x <= posBtn.x + btnSize.x) {
         if (posClick.y >= posBtn.y && posClick.y <= posBtn.y + btnSize.y) {
@@ -95,9 +108,11 @@ bool findStartBtn(Vector2 posBtn, Vector2 posClick, Vector2 btnSize) {
     return false;
 }
 
-void makeMap(std::vector<Cell>& cellMap, Vector2 cellSize, int gridCount, std::vector<short> pattern) {
+// Returns alive cells
+int makeMap(std::vector<Cell>& cellMap, Vector2 cellSize, int gridCount, std::vector<short> pattern) {
     // Create initial cell state map
-    short cellIndex = 0;
+    int cellIndex = 0;
+    int aliveCells = 0;
     std::vector<Cell> newMap = {};
     for (short i = 0; i < gridCount; i++) {
         for (short j = 0; j < gridCount; j++) {
@@ -109,6 +124,7 @@ void makeMap(std::vector<Cell>& cellMap, Vector2 cellSize, int gridCount, std::v
             bool enabled = false;
             if (std::find(pattern.begin(), pattern.end(), cellIndex) != pattern.end()) {
                 enabled = true;
+                aliveCells++;
             }
 
             newMap.push_back(Cell(cellIndex, enabled, position, cellSize));
@@ -116,18 +132,23 @@ void makeMap(std::vector<Cell>& cellMap, Vector2 cellSize, int gridCount, std::v
         }
     }
     cellMap = newMap;
+    return aliveCells;
 }
-
+#ifdef _DEBUG
 int main(int argc, char* argv[]) {
-    int currentPatternIndex = 0;
+#else
+int WinMain() {
+#endif
+    int currentPatternIndex = 1;
     Pattern currentPattern = patterns.at(currentPatternIndex);
 
     short gridCount = currentPattern.gridCount;
-    float simsPerSec = 2.5f;
+    float simsPerSec = 10.0f;
 
-    Vector2 cellSize = { WINDOW_WIDTH / gridCount, (WINDOW_HEIGHT - HEADER_HEIGHT) / gridCount };
+    Vector2 cellSize = { (float)WINDOW_WIDTH / gridCount, (float)(WINDOW_HEIGHT - HEADER_HEIGHT) / gridCount };
 
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Game of Life");
+    InitAudioDevice();
     SetTargetFPS(180);
 
     // Initial states
@@ -138,6 +159,14 @@ int main(int argc, char* argv[]) {
     double timeSinceLastSim = 1;
     int lastToggledID = -1;
     int aliveCellCount = 0;
+
+    Sound newGenSound = LoadSound("resources/gen.wav");
+    SetSoundVolume(newGenSound, 0.05f);
+
+    Music bgMusicStream = LoadMusicStream("resources/bg_music.ogg");
+    bgMusicStream.looping = true;
+    SetMusicVolume(bgMusicStream, 0.05f);
+    PlayMusicStream(bgMusicStream);
 
     Rectangle btnStart;
     btnStart.x = WINDOW_WIDTH / 2 - 50;
@@ -165,10 +194,12 @@ int main(int argc, char* argv[]) {
     btnRight.width = 50;
     btnRight.height = 25;
 
-    makeMap(cellMap, cellSize, currentPattern.gridCount, currentPattern.aliveCells);
+    aliveCellCount = makeMap(cellMap, cellSize, currentPattern.gridCount, currentPattern.aliveCells);
 
     while (!WindowShouldClose()) {
         if (!IsWindowReady()) continue;
+
+        UpdateMusicStream(bgMusicStream);
 
         int fps = GetFPS();
         std::string fpsText = "FPS: " + std::to_string(fps);
@@ -177,6 +208,7 @@ int main(int argc, char* argv[]) {
         std::string speedText = "Speed: " + std::to_string(simsPerSec) + " sims/s";
         std::string startStopText = gameState == pickingCells ? "Start" : "Stop";
         std::string cellCounter = "Alive cells: " + std::to_string(aliveCellCount);
+        std::string presetText = "Preset: " + currentPattern.name;
         btnStartColor = gameState == pickingCells ? GREEN : RED;
 
         // Input
@@ -187,6 +219,7 @@ int main(int argc, char* argv[]) {
             if (mouseY > HEADER_HEIGHT) {
                 Cell* foundCell = findCell(cellMap, mouseX, mouseY);
                 if (foundCell != nullptr && lastToggledID != foundCell->id) {
+                    std::cout << "Clicked cell -- " << foundCell->id << "\n";
                     foundCell->toggle();
                     if (foundCell->alive) aliveCellCount++;
                     else aliveCellCount--;
@@ -218,8 +251,9 @@ int main(int argc, char* argv[]) {
                 }
                 else if (wasReloadPressed) {
                     gameState = pickingCells;
-                    aliveCellCount = 0;
-                    makeMap(cellMap, cellSize, gridCount, currentPattern.aliveCells);
+                    gridCount = currentPattern.gridCount;
+                    cellSize = { (float)WINDOW_WIDTH / gridCount, (float)(WINDOW_HEIGHT - HEADER_HEIGHT) / gridCount };
+                    aliveCellCount = makeMap(cellMap, cellSize, gridCount, currentPattern.aliveCells);
                 }
                 else if (wasLeftPressed) {
                     currentPatternIndex--;
@@ -227,8 +261,7 @@ int main(int argc, char* argv[]) {
                     currentPattern = patterns[currentPatternIndex];
                     gridCount = currentPattern.gridCount;
                     cellSize = { (float)WINDOW_WIDTH / gridCount, (float)(WINDOW_HEIGHT - HEADER_HEIGHT) / gridCount };
-                    aliveCellCount = 0;
-                    makeMap(cellMap, cellSize, gridCount, currentPattern.aliveCells);
+                    aliveCellCount = makeMap(cellMap, cellSize, gridCount, currentPattern.aliveCells);
                 }
                 else if (wasRightPressed) {
                     currentPatternIndex++;
@@ -236,8 +269,7 @@ int main(int argc, char* argv[]) {
                     currentPattern = patterns[currentPatternIndex];
                     gridCount = currentPattern.gridCount;
                     cellSize = { (float)WINDOW_WIDTH / gridCount, (float)(WINDOW_HEIGHT - HEADER_HEIGHT) / gridCount };
-                    aliveCellCount = 0;
-                    makeMap(cellMap, cellSize, gridCount, currentPattern.aliveCells);
+                    aliveCellCount = makeMap(cellMap, cellSize, gridCount, currentPattern.aliveCells);
                 }
             }
         }
@@ -248,14 +280,14 @@ int main(int argc, char* argv[]) {
             if (gridCount < MIN_GRID) gridCount = MIN_GRID;
             cellSize = { (float)WINDOW_WIDTH / gridCount, (float)(WINDOW_HEIGHT - HEADER_HEIGHT) / gridCount };
             aliveCellCount = 0;
-            makeMap(cellMap, cellSize, gridCount, patterns[0].aliveCells);
+            aliveCellCount = makeMap(cellMap, cellSize, gridCount, patterns[0].aliveCells);
         }
         else if ((int)GetMouseWheelMove() <= -1) {
             gridCount++;
             if (gridCount > MAX_GRID) gridCount = MAX_GRID;
             cellSize = { (float)WINDOW_WIDTH / gridCount, (float)(WINDOW_HEIGHT - HEADER_HEIGHT) / gridCount };
             aliveCellCount = 0;
-            makeMap(cellMap, cellSize, gridCount, patterns[0].aliveCells);
+            aliveCellCount = makeMap(cellMap, cellSize, gridCount, patterns[0].aliveCells);
         }
 
         // Simulation speed control
@@ -265,6 +297,9 @@ int main(int argc, char* argv[]) {
         }
         else if (IsKeyDown(KEY_RIGHT)) {
             simsPerSec += 0.05f;
+        }
+        else if (IsKeyPressed(KEY_SPACE)) {
+            printAliveIDS(cellMap);
         }
 
         if (gameState == simulating) {
@@ -321,6 +356,7 @@ int main(int argc, char* argv[]) {
                 cellMap = nextGen;
                 simulationCounter++;
                 timeSinceLastSim = 0;
+                if (simsPerSec < 20) PlaySound(newGenSound);
             }
             else {
                 timeSinceLastSim += GetFrameTime();
@@ -347,17 +383,16 @@ int main(int argc, char* argv[]) {
         DrawText(speedText.c_str(), 15, 55, 16, { 255, 255, 255, 255 });
 
         // Bottom center header text
-        DrawText(cellCounter.c_str(), WINDOW_WIDTH / 2 - 80, HEADER_HEIGHT - 35, 30, { 255, 255, 255, 255 });
+        DrawText(cellCounter.c_str(), WINDOW_WIDTH / 2 - 80, HEADER_HEIGHT - 25, 20, { 255, 255, 255, 255 });
+        DrawText(presetText.c_str(), WINDOW_WIDTH / 2 + 120, HEADER_HEIGHT - 25, 20, {255, 255, 255, 255});
 
         // Start / Stop button
         DrawRectangleRec(btnStart, btnStartColor);
         DrawText(startStopText.c_str(), WINDOW_WIDTH / 2 - 20, 15, 16, { 255, 255, 255, 255 });
 
         // Refresh button
-        if (aliveCellCount > 0) {
-            DrawRectangleRec(btnRefresh, btnRefreshColor);
-            DrawText("Clear", WINDOW_WIDTH / 2 + 80, 15, 16, { 255, 255, 255, 255 });
-        }
+        DrawRectangleRec(btnRefresh, btnRefreshColor);
+        DrawText("Reset", WINDOW_WIDTH / 2 + 80, 15, 16, { 255, 255, 255, 255 });
 
         // Pattern navigation buttons
         DrawRectangleRec(btnLeft, btnRefreshColor);
@@ -368,5 +403,9 @@ int main(int argc, char* argv[]) {
         EndDrawing();
     }
 
+    UnloadSound(newGenSound);
+    UnloadMusicStream(bgMusicStream);
+
+    CloseAudioDevice();
     CloseWindow();
 }
