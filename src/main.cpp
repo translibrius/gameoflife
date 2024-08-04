@@ -1,68 +1,13 @@
 #include "raylib.h"
-#include <string>
-#include <vector>
-#include <iostream>
-#include <chrono>
+#include "common.h"
 
-static const Color COLOR_CELL_BORDER_DEAD = { 230, 41, 55, 90 };  // Red
-static const Color COLOR_CELL_BORDER_ALIVE = { 230, 41, 55, 255 }; // Gold
-static const short CELL_BORDER_WIDTH = 3;
-static const short CELL_PADDING = 1;
-static const Color COLOR_CELL_DEAD = { 20, 20, 0, 255 };
-static const Color COLOR_CELL_ALIVE = { 100, 20, 0, 200 };
-static const Color COLOR_BACKGROUND = { 30, 30, 30, 255 };
-
-static const short WINDOW_WIDTH = 720;
-static const short WINDOW_HEIGHT = 800;
-static const short HEADER_HEIGHT = 80;
-
-static const short MIN_GRID = 3;
-static const short MAX_GRID = 120;
-
-struct Cell {
-    Cell(int id, bool alive, Vector2 pos, Vector2 size) {
-        this->id = id;
-        this->alive = alive;
-        this->position = pos;
-        this->size = size;
-    }
-
-    int id;
-    bool alive;
-    Vector2 position;
-    Vector2 size;
-
-    void toggle() {
-        this->alive = !alive;
-    }
-
-    void draw() {
-        // Border
-        DrawRectangle(
-            position.x + CELL_PADDING,
-            position.y + CELL_PADDING,
-            size.x - 2 * CELL_PADDING,
-            size.y - 2 * CELL_PADDING,
-            alive ? COLOR_CELL_BORDER_ALIVE : COLOR_CELL_BORDER_DEAD
-        );
-        // Cell
-        DrawRectangle(
-            position.x + CELL_BORDER_WIDTH + CELL_PADDING,
-            position.y + CELL_BORDER_WIDTH + CELL_PADDING,
-            size.x - 2 * (CELL_BORDER_WIDTH + CELL_PADDING),
-            size.y - 2 * (CELL_BORDER_WIDTH + CELL_PADDING),
-            alive ? COLOR_CELL_ALIVE : COLOR_CELL_DEAD
-        );
-    }
+enum GameState {
+    pickingCells,
+    simulating,
 };
 
-struct Pattern {
-    std::string name;
-    int gridCount;
-    std::vector<short> aliveCells;
-};
 
-std::vector<Pattern> patterns = {
+const std::vector<Pattern> patterns = {
     {"Empty", 15, {}},
     {"Gliders", 50, { 53, 101, 103, 152, 153, 256, 304, 306, 355, 356, 1017, 1018, 1067, 1068 } },
     {"GliderGun", 50, { 829, 877, 879, 917, 918, 925, 926, 939, 940, 966, 970, 975, 976, 989, 990,
@@ -70,34 +15,6 @@ std::vector<Pattern> patterns = {
     1129, 1166, 1170, 1217, 1218, }},
     {"BlinkerPuffer1", 71, { 2097, 2098, 2099, 2103, 2104, 2105, 2136, 2154, 2168, 2171, 2173, 2176, 2206, 2207, 2208, 2212, 2213, 2214, 2218, 2219, 2220, 2224, 2225, 2226, 2234, 2239, 2247, 2252, 2277, 2279, 2280, 2283, 2286, 2288, 2291, 2294, 2295, 2297, 2304, 2305, 2306, 2310, 2318, 2322, 2323, 2324, 2349, 2350, 2351, 2354, 2362, 2365, 2366, 2367, 2375, 2377, 2378, 2381, 2389, 2392, 2393, 2395, 2420, 2421, 2422, 2425, 2433, 2436, 2437, 2438, 2447, 2448, 2449, 2452, 2460, 2463, 2464, 2465, 2491, 2492, 2493, 2496, 2504, 2507, 2508, 2509, 2518, 2519, 2520, 2523, 2531, 2534, 2535, 2536, 2562, 2563, 2567, 2570, 2572, 2575, 2579, 2580, 2589, 2590, 2594, 2597, 2599, 2602, 2606, 2607, 2639, 2640, 2644, 2645, 2666, 2667, 2671, 2672, 2852, 2853, 2854, 2856, 2857, 2858, 2950, 2951, 2952, 2954, 2955, 2956, }},
 };
-
-enum GameState {
-    pickingCells,
-    simulating,
-};
-
-Cell* findCell(std::vector<Cell>& cellList, int mouseX, int mouseY) {
-    for (Cell& cell : cellList) {
-        if (mouseX >= cell.position.x && mouseX <= cell.position.x + cell.size.x) {
-            if (mouseY >= cell.position.y && mouseY <= cell.position.y + cell.size.y) {
-                // Found cell
-                return &cell;
-            }
-        }
-    }
-
-    std::cout << "Could not find cell\n";
-    return nullptr;
-}
-
-void printAliveIDS(std::vector<Cell> cellMap) {
-    std::string output = "Alive: { ";
-    for (Cell cell : cellMap) {
-        if (cell.alive) output += std::to_string(cell.id) + ", ";
-    }
-    output += "}";
-    std::cout << output << "\n";
-}
 
 // Returns alive cells
 int makeMap(std::vector<Cell>& cellMap, Vector2 cellSize, int gridCount, std::vector<short> pattern) {
@@ -125,6 +42,7 @@ int makeMap(std::vector<Cell>& cellMap, Vector2 cellSize, int gridCount, std::ve
     cellMap = newMap;
     return aliveCells;
 }
+
 #ifdef _DEBUG
 int main(int argc, char* argv[]) {
 #else
